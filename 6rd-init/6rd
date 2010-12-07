@@ -32,7 +32,7 @@ glob_6rd_iface="6rdtun"			# Name of the interface for the 6rd tunnel
 glob_lan_iface="eth0.10"		# Your LAN IPv4/6 interface
 glob_wan_iface="eth0.20"		# Your WAN IPv4 interface
 
-# INCOMPLETE
+# COMPLETED
 function ipv4to6rd {
 	# $1 : IPv4 to consider (External IPv4 of the site)
 	# $2 : IPv6 Prefix (6rd Prefix from ISP)
@@ -42,17 +42,18 @@ function ipv4to6rd {
 	ipv4_hex=ipv4tohex $1
 	
 	# Get IPv6 Mask and prefix
-	ipv6_6rd_mask=ipv6pfxtomask $2	
-	ipv6_6rd_net=ipv6pfxtonet $2
+	ipv6_6rd_mask=$(ipv6pfxtomask $2)
+	ipv6_6rd_net=$(ipv6pfxtonet $2)
 	
 	# Add the IPv4 to the Net
+	printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - $ipv6_6rd_mask)) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
 	
 	# Customer subnet is now 6rd_mask + 32 (ip address size)
 	
-	
+	printf "%16x" $ipv6_6rd_cust
 }
 
-# COMPLETED
+# COMPLETED TESTED
 function ipv6pfxtomask {
 	# $1 : prefix IPv6 (with mask)
 	# Will return the subnet mask (without "/", ":")
@@ -60,7 +61,7 @@ function ipv6pfxtomask {
 	printf $(echo $1 | cut -f 2 -d "/")
 }
 
-# COMPLETED
+# COMPLETED TESTED
 function ipv6pfxtonet {
 	# $1 : prefix IPv6 (with mask)
 	# Will return the complete subnet address (without "/", but with ":")
