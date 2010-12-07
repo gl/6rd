@@ -189,7 +189,7 @@ function ipv6subnet {
 	#                  ^ That one
 
 	
-	
+	printf "%16x" $(( 0x$1 + $2 ))
 }
 
 # implements startup of 6rd
@@ -253,19 +253,19 @@ start() {
 
 	# echo Configuring...
 	# Configure the tunnel
-	ip tunnel add $glob_6rd_iface mode sit ttl 64 local $ipv4_wan
-	ip tunnel 6rd dev $glob_6rd_iface 6rd-prefix $glob_6rd_net
-	ip link set $glob_6rd_iface up
-	ip -6 addr add $ipv6_tun/64 dev $glob_6rd_iface
+#	ip tunnel add $glob_6rd_iface mode sit ttl 64 local $ipv4_wan
+#	ip tunnel 6rd dev $glob_6rd_iface 6rd-prefix $glob_6rd_net
+#	ip link set $glob_6rd_iface up
+#	ip -6 addr add $ipv6_tun/64 dev $glob_6rd_iface
 
 	# Configure the LAN
-	ip -6 addr add $ipv6_lan/64 dev $glob_lan_iface
-	ip -6 route add 2000::/3 via ::$glob_6rd_br dev 6rdtun
+#	ip -6 addr add $ipv6_lan/64 dev $glob_lan_iface
+#	ip -6 route add 2000::/3 via ::$glob_6rd_br dev 6rdtun
 
 	# Restart RADVD if necessary
-	if [ -x /etc/init.d/radvd ]; then
-		/etc/init.d/radvd restart
-	fi
+#	if [ -x /etc/init.d/radvd ]; then
+#		/etc/init.d/radvd restart
+#	fi
 
 	# log the realized operation
 	logger "IPv6 using 6rd configured (ipv4 public: $ipv4, ipv6: $ipv6)"
