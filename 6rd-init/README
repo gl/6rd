@@ -8,6 +8,7 @@
 	- Linux >= 2.6.33
 	- iproute2 >= 2.6.33
 	- bash >= 3
+	- cat & cut, but they almost default features on linux.
 
 2. WHERE IS IT KNOWN TO BE WORKING ?
 
@@ -31,8 +32,9 @@
 
 	- cp 6rd /etc/init.d/6rd
 	- chmod 755 /etc/init.d/6rd
-	- cp default-6rd /etc/default/6rd
-	
+	- cp etc-efault-6rd /etc/default/6rd
+And edit /etc/default/6rd ...
+
 	as root !
 	
 6. USAGE ?
