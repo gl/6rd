@@ -19,41 +19,35 @@
 ###############################################################################
 
 # Some things that run always
-touch /var/lock/6rd
 ipfile="/tmp/ipv4.txt"
 
-# Global Variables
-# WARNING : the script will accept only 6RD prefixes sizes 24,28,32.
-glob_6rd_net="2a02:1200::/28"	# 6RD prefix of your ISP. They provide it to you.
-glob_6rd_br="164.128.155.23"	# 6RD Anycast BR of your ISP.
-glob_6rd_iface="6rdtun"			# Name of the interface for the 6rd tunnel
+if [ -r /etc/default/6rd ]; then
+    . /etc/default/6rd
+else
+	echo "6rd : Error : Can't get the values from the /etc/default/6rd file"
+	exit 1
+fi
 
-# Interfaces. They can be the same if this box is not routing ipv4.
-glob_lan_iface="eth0.10"		# Your LAN IPv4/6 interface
-glob_wan_iface="eth0.20"		# Your WAN IPv4 interface
-
-# COMPLETED
 function ipv4to6rd {
 	# $1 : IPv4 to consider (External IPv4 of the site)
 	# $2 : IPv6 Prefix (6rd Prefix from ISP)
 	# Will return the customer 6rd prefix
 	
 	# Change the IPv4 into a 8-hex-digit string
-	ipv4_hex=ipv4tohex $1
+	ipv4_hex=$(ipv4tohex $1)
 	
 	# Get IPv6 Mask and prefix
 	ipv6_6rd_mask=$(ipv6pfxtomask $2)
 	ipv6_6rd_net=$(ipv6pfxtonet $2)
 	
 	# Add the IPv4 to the Net
-	printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - $ipv6_6rd_mask)) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
+	printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - (( 1 + $ipv6_6rd_mask/4) * 4 ))) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
 	
 	# Customer subnet is now 6rd_mask + 32 (ip address size)
 	
 	printf "%16x" $ipv6_6rd_cust
 }
 
-# COMPLETED TESTED
 function ipv6pfxtomask {
 	# $1 : prefix IPv6 (with mask)
 	# Will return the subnet mask (without "/", ":")
@@ -61,7 +55,6 @@ function ipv6pfxtomask {
 	printf $(echo $1 | cut -f 2 -d "/")
 }
 
-# COMPLETED TESTED
 function ipv6pfxtonet {
 	# $1 : prefix IPv6 (with mask)
 	# Will return the complete subnet address (without "/", but with ":")
@@ -96,7 +89,6 @@ function ipv6pfxtonet {
 }
 
 
-# COMPLETED
 function ipv4tohex {
 	# $1 : value of the IPv4 (with dots)
 	# Will return the IPv4 in hex
@@ -104,7 +96,6 @@ function ipv4tohex {
 	printf "%02x%02x%02x%02x" $(echo $ipv4 | tr "." " ")
 }
 
-# COMPLETED & TESTED
 function hextoip {
 	# $1 : value of the 1st 64 bits
 	# $2 : value of the last 64 bits
@@ -176,19 +167,12 @@ function hextoip {
 }
 
 
-function hexto16n {
-	# $1 : math value
-	printf "%16x" $1
-#	printf -v ipv6_eth_lan_nocolon "%16x" $((0x$ipv6_nocolon + 0x1))
-}
-
 function ipv6subnet {
 	# $1 : IPv6 6rd prefix customer
 	# $2 : increment for the last nibble in the first /64:
 	# 2001:db8:0001:000X
 	#                  ^ That one
 
-	
 	printf "%16x" $(( 0x$1 + $2 ))
 }
 
@@ -202,19 +186,20 @@ start() {
 
 	# Maths and String part ... funny stuff !
 	# Check that the prefix is supported		
-	ipv6_6rd_mask=$(echo $glob_6rd_net | cut -f 2 -d "/")		
+	ipv6_6rd_mask=$(ipv6pfxtomask $glob_6rd_net)
 	if [ $ipv6_6rd_mask != 24 -a $ipv6_6rd_mask != 28 -a $ipv6_6rd_mask != 32 ]; then
-		echo "6rd : Error : Can't deal with subnet prefixes other than /24, /28, or /32."			
-		exit
+		echo "6rd : Warning : Very strange to see a subnetmask other than /24, /28, or /32."			
+		#exit
 	fi
 	
 	# Get our real public IPv4 address.
+	ipv4_regexp="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 	ipv4=$(cat $ipfile)
-	if [[ ! $ipv4 =~ \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} ]]; then
+	if [[ ! $ipv4 =~ $ipv4_regexp ]]; then
 		sleep 5; # Try again in 5 seconds, then give up
 		wget --output-document=$ipfile http://whatismyip.org
 		ipv4=$(cat $ipfile)
-		if [[ ! $ipv4 =~ \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} ]]; then
+		if [[ ! $ipv4 =~ $ipv4_regexp ]]; then
 			# give up
 			echo "6rd : Error : Can't get IPv4 public IP address."
 			exit
@@ -222,50 +207,48 @@ start() {
 	fi
 
 	# IPv4 WAN IPv4 address. Can be either public or private, doesn't matter.
-	ipv4_wan				= $(ifconfig $glob_wan_iface | awk '/inet ad?r/ {split ($2,A,":"); print A[2]}')
+	ipv4_wan=$(ifconfig $glob_wan_iface | awk '/inet ad?r/ {split ($2,A,":"); print A[2]}')
 	
-	# From the WAN IPv4 address, we deduct the IPv6 customer prefix.
-	ipv6_6rd_prefix 		= ipv4to6rd $ipv4_wan
+	# From the Public IPv4 address, we deduct the IPv6 customer prefix.
+	ipv6_6rd_prefix=$(ipv4to6rd $ipv4 $glob_6rd_net)
 	
 	# The customer prefix is either a /24 or /28 : 1st subnet for tunnel, 2nd for LAN
 	# The customer prefix is = /32 : Subnet only the LAN (doesn't work ?)
-	ipv6_wan = ipv6subnet $ipv6_6rd_prefix 0x0
-	ipv6_lan = ipv6subnet $ipv6_6rd_prefix 0x1
-	if [ipv6pfxtomask $ipv6_6rd_prefix == 32]; then
-		ipv6_lan = ipv6_wan
+	ipv6_wan=$(ipv6subnet $ipv6_6rd_prefix 0x0)
+	ipv6_lan=$(ipv6subnet $ipv6_6rd_prefix 0x1)
+	if [ $ipv6_6rd_mask = 32 ]; then
+		ipv6_lan=$ipv6_wan
 	fi
 	
-#	ipv4_hex 				= ipv4tohex $ipv4_wan
-
-#	printf -v ipv6_nocolon "%16x" $((0x$pfx_6rd_nocolon*0x10**(16-$ipv6_6rd_mask/4)+0x$ipv4_hex*0x10**(8-$ipv6_6rd_mask/4)))
-	ipv6_wan				= ${ipv6_nocolon:0:4}:${ipv6_nocolon:4:4}:${ipv6_nocolon:8:4}:${ipv6_nocolon:12}::1
+	ipv6=$(hextoip $ipv6_wan 0000000000000001)
 
 	# Now deal with the LAN Subnet for $glob_eth_iface
 	# This will work in fact only with /28 and /24 ... no idea about /32
 	# We in fact just pick up the next /64 in our allocated /60 or /56
-	ipv6_eth_lan_nocolon=$(hexto16n $ipv6_6rd_prefix)
-	ipv6_eth_lan=$(hextoip $ipv6_eth_lan_nocolon $(hexto16n 0x1))
+	ipv6_lan=$(hextoip $ipv6_lan 0000000000000001)
 
 	# display status
-	echo 6rd - PUBLIC IPv4 address is $ipv4_pub
-	echo 6rd - PUBLIC IPv6 address is $ipv6_tun
+	echo 6rd - PUBLIC IPv4 address is $ipv4
+	echo 6rd - PUBLIC IPv6 address is $ipv6
 	echo 6rd - $glob_lan_iface IPv6 address is $ipv6_lan
 
 	# echo Configuring...
 	# Configure the tunnel
-#	ip tunnel add $glob_6rd_iface mode sit ttl 64 local $ipv4_wan
-#	ip tunnel 6rd dev $glob_6rd_iface 6rd-prefix $glob_6rd_net
-#	ip link set $glob_6rd_iface up
-#	ip -6 addr add $ipv6_tun/64 dev $glob_6rd_iface
+	ip tunnel add $glob_6rd_iface mode sit ttl 64 local $ipv4_wan
+	ip tunnel 6rd dev $glob_6rd_iface 6rd-prefix $glob_6rd_net
+	ip link set $glob_6rd_iface up
+	if [ $ipv6_6rd_mask != 32 ]; then
+		ip -6 addr add $ipv6/64 dev $glob_6rd_iface
+	fi
 
 	# Configure the LAN
-#	ip -6 addr add $ipv6_lan/64 dev $glob_lan_iface
-#	ip -6 route add 2000::/3 via ::$glob_6rd_br dev 6rdtun
+	ip -6 addr add $ipv6_lan/64 dev $glob_lan_iface
+	ip -6 route add 2000::/3 via ::$glob_6rd_br dev 6rdtun
 
 	# Restart RADVD if necessary
-#	if [ -x /etc/init.d/radvd ]; then
-#		/etc/init.d/radvd restart
-#	fi
+	if [ -x /etc/init.d/radvd ]; then
+		/etc/init.d/radvd restart
+	fi
 
 	# log the realized operation
 	logger "IPv6 using 6rd configured (ipv4 public: $ipv4, ipv6: $ipv6)"
@@ -273,11 +256,11 @@ start() {
 
 # stops 6rd and flushes all routes and addresses
 stop() {
-	/sbin/ip -6 route flush dev 6rdtun
+	/sbin/ip -6 route flush dev $glob_6rd_iface
 	/sbin/ip -6 route flush scope global
 	/sbin/ip -6 addr flush scope global
-	/sbin/ip link set dev 6rdtun down
-	/sbin/ip tunnel del 6rdtun
+	/sbin/ip link set dev $glob_6rd_iface down
+	/sbin/ip tunnel del $glob_6rd_iface
 }
 
 status() {
