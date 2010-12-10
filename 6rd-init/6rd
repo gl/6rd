@@ -41,7 +41,15 @@ function ipv4to6rd {
 	ipv6_6rd_net=$(ipv6pfxtonet $2)
 	
 	# Add the IPv4 to the Net
-	printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - $ipv6_6rd_mask)) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
+	if [ $(( $ipv6_6rd_mask % 4)) = 0 ]
+	then
+		# Case where the mask falls on an hex digit
+		printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - $ipv6_6rd_mask)) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
+	else
+		# Case where not ...
+		printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - ($ipv6_6rd_mask + 1) / 4 * 4)) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
+	fi
+
 	
 	# Customer subnet is now 6rd_mask + 32 (ip address size)
 	
