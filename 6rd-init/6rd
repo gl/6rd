@@ -47,7 +47,7 @@ function ipv4to6rd {
 		printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - $ipv6_6rd_mask)) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
 	else
 		# Case where not ...
-		printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - ($ipv6_6rd_mask + 1) / 4 * 4)) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
+		printf -v ipv6_6rd_cust  $(( (0x$ipv6_6rd_net << (64 - ((1 + $ipv6_6rd_mask / 4) * 4))) + ( 0x$ipv4_hex << (32 - $ipv6_6rd_mask)) ))
 	fi
 
 	
