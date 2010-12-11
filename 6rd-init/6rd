@@ -15,7 +15,7 @@
 # 6rd : Script to start / stop 6rd IPv6
 #
 # Changelog:
-# Version 1.0rc7 (20101208) : Fixed the /28 v4 insertion issue.
+# Version 1.0rc8 (201012xx) : wget -4, just in case :)
 ###############################################################################
 
 # Some things that run always
@@ -188,9 +188,9 @@ function ipv6subnet {
 start() {
 
 	# Need to get my ip automatically. I use whatismyip.org's automation page
-	# WGET doesn't support v6 today but if one day it does
-	# we'll have to force it to v4 !
+	# Right now this page answers only on v4.
 	wget --output-document=$ipfile http://whatismyip.org
+	#wget -4 --output-document=$ipfile http://whatismyip.org
 
 	# Maths and String part ... funny stuff !
 	# Check that the prefix is supported		
