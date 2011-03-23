@@ -19,6 +19,8 @@
 #   - Improvements in IPv4 detection from Bruce Pinsky (bep)
 #   - Allows now several LAN interfaces.
 #	- Allows specific routes for IPv6 WAN
+#	- Improved /32 6rd prefix handling (not tested in the wild)
+#	- Improved the stop behaviour
 ###############################################################################
 
 # Some things that run always
@@ -335,31 +337,35 @@ start() {
 	fi
 
 	# Configure the LAN
-	array_lan_ifaces=( $glob_lan_ifaces )
-	for ((i=0; i<${#array_lan_ifaces[*]}; i++ )); do
-		do_debug "Info : Calculating LAN IPv6 for ${array_lan_ifaces[${i}]}"
+	i=1
+	for lan_iface in $glob_lan_ifaces ; do
+		do_debug "Info : Calculating LAN IPv6 for $lan_iface"
 		# The customer prefix is = /32 : Subnet only the LAN (doesn't work ?)
 		if [ $ipv6_6rd_mask = 32 ]; then
-			ipv6_lan=$ipv6_wan
+			ipv6_lan=$ipv6
 		else
 			# This will work in fact only with /28 and /24 ... no idea about /32
 			# We in fact just pick up the next /64 in our allocated /60 or /56
-			ipv6_lan=$(ipv6subnet $ipv6_6rd_prefix $(( $i + 1 )))
+			ipv6_lan=$(ipv6subnet $ipv6_6rd_prefix $i)
 			ipv6_lan=$(hextoip $ipv6_lan 0000000000000001)
 		fi
-		do_cmd "echo 6rd - ${array_lan_ifaces[${i}]} IPv6 address is $ipv6_lan"
-		do_cmd "ip -6 addr add $ipv6_lan/64 dev ${array_lan_ifaces[${i}]}"
+		do_cmd "echo 6rd - $lan_iface IPv6 address is $ipv6_lan"
+		do_cmd "ip -6 addr add $ipv6_lan/64 dev $lan_iface"
+		if [ $ipv6_6rd_mask = 32 ]; then
+			do_cmd "echo 6rd - WARNING : 6rd prefix /32 : calculated /64 configured only on first LAN."
+			break
+		fi
+		((i++))
 	done
 
 	if [ "$glob_wan_default_route" == "yes" ]; then
 		do_cmd "ip -6 route add 2000::/3 via ::$glob_6rd_br dev $glob_6rd_iface"
 	else
-		do_debug "Info : Not setting default route pointing on the WAN."
+		do_debug "Info : Not setting default route pointing to the WAN."
 	fi
 
-	array_wan_routes=( $glob_wan_routes )
-	for ((i=0; i<${#array_wan_routes[*]}; i++ )); do
-		do_cmd "ip -6 route add ${array_wan_routes[${i}]} via ::$glob_6rd_br dev $glob_6rd_iface"
+	for ipv6_route in $glob_wan_routes ; do
+		do_cmd "ip -6 route add $ipv6_route via ::$glob_6rd_br dev $glob_6rd_iface"
 	done
 
 	# Restart RADVD if necessary
@@ -374,13 +380,33 @@ start() {
 }
 
 # stops 6rd and flushes all routes and addresses
-# TODO: Tune it depending on interfaces configured
 stop() {
+
+	if [[ "$do_nothing" == "yes" ]]; then
+		do_debug "WARNING : do_nothing=\"yes\" configured - Not configuring your box, and enabling debug."
+	fi
+
+	# Clean the WAN
 	do_cmd "ip -6 route flush dev $glob_6rd_iface"
-	do_cmd "ip -6 route flush scope global"
-	do_cmd "ip -6 addr flush scope global"
+	do_cmd "ip -6 addr flush dev $glob_6rd_iface scope global"
 	do_cmd "ip link set dev $glob_6rd_iface down"
 	do_cmd "ip tunnel del $glob_6rd_iface"
+	
+	# Probably you don't want to do this !
+	# do_cmd "ip -6 route flush scope global"
+	
+	# Clean the LAN interfaces configured
+	for lan_iface in $glob_lan_ifaces ; do
+		do_cmd "ip -6 route flush dev $lan_iface"
+		do_cmd "ip -6 addr flush dev $lan_iface scope global"		
+	done
+	
+	# Restart RADVD if necessary
+	if [ -x /etc/init.d/radvd ]; then
+		do_cmd "/etc/init.d/radvd restart"
+	else
+		do_debug "Not able to restart /etc/init.d/radvd (not found or not executable)."
+	fi
 }
 
 status() {
@@ -448,7 +474,7 @@ exit 0
 # (C) Carlos M. Martinez-Cagnazzo, 2008. Original 6to4 Script.
 #     http://cagnazzo.name/drupal/6to4
 #
-# (C) Guillaume Leclanche, 2010. Completed for 6rd and non-NATed routers.
+# (C) Guillaume Leclanche, 2010-2011. Completed for 6rd and non-NATed routers.
 #     guillaume at leclanche.net
 #
 # Redistribution and use in source and binary forms, with or without 

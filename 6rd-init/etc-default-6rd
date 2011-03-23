@@ -14,6 +14,8 @@ glob_wan_iface="eth0.20"		# Your WAN IPv4 interface
 # Parameters for the WAN
 glob_wan_ip=""					# If you have a static WAN IPv4, you can define
 								# it manually here, it will bypass tests.
+								# You can also call another command to get the
+								# IPv4 if you're a very advanced user ;)
 
 glob_wan_is_private="no"		# If your WAN IPv4 is private and it's normal
 								# (eg: your ISP has Large Scale NAT and the
