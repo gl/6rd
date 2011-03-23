@@ -2,7 +2,39 @@ glob_6rd_net="2001:db8::/28"	# 6RD prefix of your ISP. They provide it to you.
 glob_6rd_br="128.66.0.1"		# 6RD Anycast BR of your ISP.
 glob_6rd_iface="6rdtun"			# Name of the interface for the 6rd tunnel
 
+
 # Interfaces. They can be the same if this box is not routing ipv4.
 glob_lan_ifaces="eth0.10 tap0"	# Your LAN IPv4/6 interfaces.
-                                # There can be several separated by space
+                                # There can be several separated by whitespace
+
 glob_wan_iface="eth0.20"		# Your WAN IPv4 interface
+
+
+#### Most of the people won't have to change the params below.
+# Parameters for the WAN
+glob_wan_ip=""					# If you have a static WAN IPv4, you can define
+								# it manually here, it will bypass tests.
+
+glob_wan_is_private="no"		# If your WAN IPv4 is private and it's normal
+								# (eg: your ISP has Large Scale NAT and the
+								# 6rd BR is reachable without LSN)
+								# Swisscom: say "no" here
+								# Comcast: ?
+								# Others: most likely "no"
+
+
+# Routes
+glob_wan_default_route="yes"	# Configure the IPv6 default route 
+								# (to Internet Unicast : 2000::/3)
+								# over the 6rd tunnel yes/no
+								
+glob_wan_routes=""				# Additional IPv6 routes that can be 
+								# configured to point to the 6rd tunnel
+								# separe them with one whitespace
+								# Ex : "2001:db8::/32 2002::/16"
+
+
+# Behaviour of the script
+do_nothing="no"					# If you want to test only, set to "yes".
+								# It will print out the commands on stdout.
+								# And some more debug as well.
