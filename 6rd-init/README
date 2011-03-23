@@ -5,15 +5,16 @@
 	
 1. WHAT IS REQUIRED ?
 
-	- Linux >= 2.6.33
-	- iproute2 >= 2.6.33
-	- bash >= 3
+	- Linux >= 2.6.33 (uname -r)
+	- iproute2 >= 2.6.33 (debian package "iproute")
+	- bash >= 3 (bash --version)
 	- cat & cut, but they almost default features on linux.
 	- wget. Unless you have manually static public v4 configured.
 
 2. WHERE IS IT KNOWN TO BE WORKING ?
 
 	- Debian, with correct linux kernel & iproute2 (see 1.)
+	- Ubuntu, with correct linux kernel & iproute2 (see 1.)
 
 3. WHERE IS IT EXPECTED TO BE WORKING ?
 
@@ -34,7 +35,8 @@
 	- cp 6rd /etc/init.d/6rd
 	- chmod 755 /etc/init.d/6rd
 	- cp etc-efault-6rd /etc/default/6rd
-And edit /etc/default/6rd ...
+	
+--- and : EDIT /etc/default/6rd !
 
 	as root !
 	
