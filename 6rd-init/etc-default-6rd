@@ -3,5 +3,6 @@ glob_6rd_br="128.66.0.1"		# 6RD Anycast BR of your ISP.
 glob_6rd_iface="6rdtun"			# Name of the interface for the 6rd tunnel
 
 # Interfaces. They can be the same if this box is not routing ipv4.
-glob_lan_iface="eth0.10"		# Your LAN IPv4/6 interface
+glob_lan_ifaces="eth0.10 tap0"	# Your LAN IPv4/6 interfaces.
+                                # There can be several separated by space
 glob_wan_iface="eth0.20"		# Your WAN IPv4 interface

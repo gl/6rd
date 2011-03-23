@@ -15,7 +15,9 @@
 # 6rd : Script to start / stop 6rd IPv6
 #
 # Changelog:
-# Version 1.0rc8 (201012xx) : wget -4, just in case :)
+# Version 1.0rc8 (20110309)
+#   - Improvements in IPv4 detection from Bruce Pinsky (bep)
+#   - Allows now several LAN interfaces.
 ###############################################################################
 
 # Some things that run always
@@ -27,6 +29,33 @@ else
 	echo "6rd : Error : Can't get the values from the /etc/default/6rd file"
 	exit 1
 fi
+
+function is_public_ipv4 {
+	# $1 : IPv4 to test
+	# Will return 1 or 0
+
+	valid_ipv4_regexp="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" 
+
+	nonpublic_ipv4_regexp=( "^10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" \
+						    "^192\.168\.[0-9]{1,3}\.[0-9]{1,3}" \
+						    "^172\.1[6-9]\.[0-9]{1,3}\.[0-9]{1,3}" \
+						    "^172\.2[0-9].\.[0-9]{1,3}\.[0-9]{1,3}" \
+						    "^22[4-9]\.[0-9]{1,3}.\.[0-9]{1,3}\.[0-9]{1,3}" \
+						    "^2[3-5][0-9]\.[0-9]{1,3}.\.[0-9]{1,3}\.[0-9]{1,3}" \
+						  )
+
+	#TODO Code correctly
+
+	if [[$1 !~ $valid_ipv4_regexp]], then
+		exit 1
+	fi
+
+	foreach $regexp in $nonpubli_ipv4_regexp ; do
+		if [[$1 =~ $regexp]], then
+			return 0
+		fi
+	done
+}
 
 function ipv4to6rd {
 	# $1 : IPv4 to consider (External IPv4 of the site)
@@ -187,35 +216,49 @@ function ipv6subnet {
 # implements startup of 6rd
 start() {
 
-	# Need to get my ip automatically. I use whatismyip.org's automation page
-	# Right now this page answers only on v4.
-	wget --output-document=$ipfile http://whatismyip.org
-	#wget -4 --output-document=$ipfile http://whatismyip.org
+	#### STEP 1 : Determine Public IPv4 Address
+
+	# Check if there is a static default configured in /etc/default/6rd
+	# if not, then try to get it from the WAN interface
+	# If it's not public, check if $glob_wan_is_private is defined (ISP does LSN/CGN and 6rd GW is in the private domain)
+	# last, if still no public IP, try to get it via a web service (you're natted)
+
+	# We'll need the WAN IP anyhow, so start with it.
+	ipv4_wan=$(ip -4 addr show dev $glob_wan_iface scope global | cut -s -d/ -f1 | cut -d' ' -f6)
+
+	if [ $glob_wan_ip ];  then
+			ipv4=$glob_wan_ip
+	else
+		if [ is_public_ipv4 $ipv4_wan ]; then
+			ipv4=$ipv4_wan
+		else
+			if [ $glob_wan_is_private ]; then
+				ipv4=$ipv4_wan
+			else
+				# Need to get my ip automatically.
+				# Right now this page answers only on v4.
+				wget --output-document=$ipfile http://www.whatismyip.fr/raw/
+				ipv4=$(cat $ipfile)
+			fi
+		fi
+	fi
+
+	# TODO : Check if we got an IP, otherwise return an error
+	ipv4_regexp="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+	if [[ ! $ipv4 =~ $ipv4_regexp ]]; then
+		# give up
+		echo "6rd : Error : Can't get IPv4 public IP address."
+		exit
+	fi
 
 	# Maths and String part ... funny stuff !
 	# Check that the prefix is supported		
 	ipv6_6rd_mask=$(ipv6pfxtomask $glob_6rd_net)
 	if [ $ipv6_6rd_mask != 24 -a $ipv6_6rd_mask != 28 -a $ipv6_6rd_mask != 32 ]; then
 		echo "6rd : Warning : Very strange to see a subnetmask other than /24, /28, or /32."			
+		# In fact the script supports it, but it's most likely a config error.
 		#exit
 	fi
-	
-	# Get our real public IPv4 address.
-	ipv4_regexp="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
-	ipv4=$(cat $ipfile)
-	if [[ ! $ipv4 =~ $ipv4_regexp ]]; then
-		sleep 5; # Try again in 5 seconds, then give up
-		wget --output-document=$ipfile http://whatismyip.org
-		ipv4=$(cat $ipfile)
-		if [[ ! $ipv4 =~ $ipv4_regexp ]]; then
-			# give up
-			echo "6rd : Error : Can't get IPv4 public IP address."
-			exit
-		fi
-	fi
-
-	# IPv4 WAN IPv4 address. Can be either public or private, doesn't matter.
-	ipv4_wan=$(ifconfig $glob_wan_iface | awk '/inet ad?r/ {split ($2,A,":"); print A[2]}')
 	
 	# From the Public IPv4 address, we deduct the IPv6 customer prefix.
 	ipv6_6rd_prefix=$(ipv4to6rd $ipv4 $glob_6rd_net)
@@ -250,8 +293,20 @@ start() {
 	fi
 
 	# Configure the LAN
-	ip -6 addr add $ipv6_lan/64 dev $glob_lan_iface
-	ip -6 route add 2000::/3 via ::$glob_6rd_br dev 6rdtun
+	# TODO proper parsing
+	foreach $glob_lan_ifaces do
+		ipv6_lan=$ipv6_lan_addr[$i]
+		ip -6 addr add $ipv6_lan/64 dev $lan_iface
+	done
+
+	if [ "$glob_wan_default_route" == "yes" ]; then
+		ip -6 route add 2000::/3 via ::$glob_6rd_br dev $glob_6rd_iface
+	fi
+
+	# TODO properly
+	foreach $glob_wan_routes do
+		ip -6 route add $route via ::$glob_6rd_br dev $glob_6rd_iface
+	done
 
 	# Restart RADVD if necessary
 	if [ -x /etc/init.d/radvd ]; then
@@ -263,6 +318,7 @@ start() {
 }
 
 # stops 6rd and flushes all routes and addresses
+# TODO: Tune it depending on interfaces configured
 stop() {
 	/sbin/ip -6 route flush dev $glob_6rd_iface
 	/sbin/ip -6 route flush scope global
@@ -286,6 +342,97 @@ status() {
 	/sbin/ip -6 neigh show
 }
 
+
+# tests startup of 6rd
+test() {
+
+	# Need to get my ip automatically if not specified in defaults. I use whatismyip.org's automation page
+	# WGET doesn't support v6 today but if one day it does
+	# we'll have to force it to v4 !
+
+	if [ ! $glob_wan_ip ];  then
+		wget --output-document=$ipfile http://www.whatismyip.org
+		ipv4=$(cat $ipfile)
+	else
+		ipv4=$glob_wan_ip
+	fi
+
+	# Maths and String part ... funny stuff !
+	# Check that the prefix is supported		
+	ipv6_6rd_mask=$(ipv6pfxtomask $glob_6rd_net)
+	if [ $ipv6_6rd_mask != 24 -a $ipv6_6rd_mask != 28 -a $ipv6_6rd_mask != 32 ]; then
+		echo "6rd : Warning : Very strange to see a subnetmask other than /24, /28, or /32."			
+		#exit
+	fi
+	
+	# Get our real public IPv4 address.
+	ipv4_regexp="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+	if [[ ! $ipv4 =~ $ipv4_regexp ]]; then
+		sleep 5; # Try again in 5 seconds, then give up
+		wget --output-document=$ipfile http://www.whatismyip.org
+		ipv4=$(cat $ipfile)
+		if [[ ! $ipv4 =~ $ipv4_regexp ]]; then
+			# give up
+			echo "6rd : Error : Can't get IPv4 public IP address."
+			exit
+		fi
+	fi
+
+	# From the Public IPv4 address, we deduct the IPv6 customer prefix.
+	ipv6_6rd_prefix=$(ipv4to6rd $ipv4 $glob_6rd_net)
+	
+	# The customer prefix is either a /24 or /28 : 1st subnet for tunnel, 2nd for LAN
+	# The customer prefix is = /32 : Subnet only the LAN (doesn't work ?)
+	ipv6_wan=$(ipv6subnet $ipv6_6rd_prefix 0x0)
+	ipv6_lan=$(ipv6subnet $ipv6_6rd_prefix 0x1)
+	if [ $ipv6_6rd_mask = 32 ]; then
+		ipv6_lan=$ipv6_wan
+	fi
+	
+	ipv6=$(hextoip $ipv6_wan 0000000000000001)
+
+	# Now deal with the LAN Subnet for $glob_eth_iface
+	# This will work in fact only with /28 and /24 ... no idea about /32
+	# We in fact just pick up the next /64 in our allocated /60 or /56
+	ipv6_lan=$(hextoip $ipv6_lan 0000000000000001)
+
+	# display status
+	echo Interface Info
+	echo ==============
+	echo 6rd - PUBLIC IPv4 address is $ipv4
+	echo 6rd - PUBLIC IPv6 address is $ipv6
+	echo 6rd - $glob_lan_iface IPv6 address is $ipv6_lan
+	echo
+
+	# Testing...
+	echo Configure the tunnel
+	echo ====================
+	echo ip tunnel add $glob_6rd_iface mode sit ttl 64 local $ipv4_wan
+	echo ip tunnel 6rd dev $glob_6rd_iface 6rd-prefix $glob_6rd_net
+	echo ip link set $glob_6rd_iface up
+	if [ $ipv6_6rd_mask != 32 ]; then
+		echo ip -6 addr add $ipv6/64 dev $glob_6rd_iface
+	fi
+	echo
+
+	echo Configure the LAN
+	echo =================
+	echo ip -6 addr add $ipv6_lan/64 dev $glob_lan_iface
+	echo ip -6 route add 2000::/3 via ::$glob_6rd_br dev 6rdtun
+	echo
+
+	echo Restart RADVD if necessary
+	echo ==========================
+	if [ -x /etc/init.d/radvd ]; then
+		echo /etc/init.d/radvd restart
+	fi
+	echo
+
+	echo Log the realized operation
+	echo ==========================
+	echo logger "IPv6 using 6rd configured (ipv4 public: $ipv4, ipv6: $ipv6)"
+}
+
 restart() {
 		stop
 		start
@@ -295,13 +442,18 @@ restart() {
 # Carry out specific functions when asked to by the system
 case "$1" in
   start)
-	echo "Starting script 6rd "
+	echo "Starting script 6rd"
 		start
 	;;
   stop)
 	echo "Stopping script 6rd"
 		stop
    ;;
+  test) 
+	echo "Testing script 6rd"
+	echo
+		test
+	;;
   status)
 		status
 	;;
@@ -309,7 +461,7 @@ case "$1" in
 		restart
 		;;
   *)
-	echo "Usage: /etc/init.d/6rd {start|stop|restart|status}"
+	echo "Usage: /etc/init.d/6rd {start|stop|restart|test|status}"
 	exit 1
 	;;
 esac

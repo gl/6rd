@@ -9,6 +9,7 @@
 	- iproute2 >= 2.6.33
 	- bash >= 3
 	- cat & cut, but they almost default features on linux.
+	- wget. Unless you have manually static public v4 configured.
 
 2. WHERE IS IT KNOWN TO BE WORKING ?
 
@@ -43,8 +44,15 @@ And edit /etc/default/6rd ...
 	- /etc/init.d/6rd start/restart/stop
 	
 	as root !
+
+7. AND RADVD ?
+
+	The script is not configuring radvd, so you need to configure it separately.
+	However, it will reload radvd after finishing the v6 config in order to force
+	new RAs. You can configure for each lan iface the prefix ::/64, and radvd
+	will automatically take the prefix configured on the interface.
 	
-7. WHAT IS THE LICENSE ?
+8. WHAT IS THE LICENSE ?
 	
 This is a 3-Clause BSD Licence, GPL-Compatible
 http://www.gnu.org/licenses/license-list.html#ModifiedBSD
