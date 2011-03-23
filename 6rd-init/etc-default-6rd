@@ -9,6 +9,11 @@ glob_lan_ifaces="eth0.10 tap0"	# Your LAN IPv4/6 interfaces.
 
 glob_wan_iface="eth0.20"		# Your WAN IPv4 interface
 
+# Enable or Debug ?
+do_nothing="yes"				# If you want to test only, set to "yes".
+								# It will print out the commands on stdout.
+								# And some more debug as well.
+
 
 #### Most of the people won't have to change the params below.
 # Parameters for the WAN
@@ -20,7 +25,8 @@ glob_wan_ip=""					# If you have a static WAN IPv4, you can define
 glob_wan_is_private="no"		# If your External WAN IPv4 is private and it's
 								# normal (eg: your ISP has Large Scale NAT and
 								# the 6rd BR is reachable without LSN)
-								# most likely "no" for 99% cases
+								# most likely "no" for 99% cases,
+								# including Comcast, Free, Swisscom
 
 
 # Routes
@@ -34,9 +40,5 @@ glob_wan_routes=""				# Additional IPv6 routes that can be
 								# Ex : "2001:db8::/32 2002::/16"
 
 
-# Behaviour of the script
-do_nothing="no"					# If you want to test only, set to "yes".
-								# It will print out the commands on stdout.
-								# And some more debug as well.
-								
+# Helper Tools								
 glob_download_tool="wget"		# "curl" is the other possibility. "wget" is default.

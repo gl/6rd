@@ -384,6 +384,13 @@ start() {
 		do_debug "Not able to restart /etc/init.d/radvd (not found or not executable)."
 	fi
 
+	# Restart DHCPv6 server (wide) if necessary
+	if [ -x /etc/init.d/wide-dhcpv6-server ]; then
+		do_cmd "/etc/init.d/wide-dhcpv6-server restart"
+	else
+		do_debug "Not able to restart /etc/init.d/wide-dhcpv6-server (not found or not executable)."
+	fi
+
 	# log the realized operation
 	do_cmd "logger \"IPv6 using 6rd configured (ipv4 public: $ipv4, ipv6: $ipv6)\""
 }
@@ -415,6 +422,13 @@ stop() {
 		do_cmd "/etc/init.d/radvd restart"
 	else
 		do_debug "Not able to restart /etc/init.d/radvd (not found or not executable)."
+	fi
+	
+	# Restart DHCPv6 server (wide) if necessary
+	if [ -x /etc/init.d/wide-dhcpv6-server ]; then
+		do_cmd "/etc/init.d/wide-dhcpv6-server restart"
+	else
+		do_debug "Not able to restart /etc/init.d/wide-dhcpv6-server (not found or not executable)."
 	fi
 }
 
