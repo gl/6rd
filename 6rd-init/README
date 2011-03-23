@@ -34,7 +34,7 @@
 
 	- cp 6rd /etc/init.d/6rd
 	- chmod 755 /etc/init.d/6rd
-	- cp etc-efault-6rd /etc/default/6rd
+	- cp etc-default-6rd /etc/default/6rd
 	
 --- and : EDIT /etc/default/6rd !
 

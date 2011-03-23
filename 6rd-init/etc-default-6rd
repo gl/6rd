@@ -17,12 +17,10 @@ glob_wan_ip=""					# If you have a static WAN IPv4, you can define
 								# You can also call another command to get the
 								# IPv4 if you're a very advanced user ;)
 
-glob_wan_is_private="no"		# If your WAN IPv4 is private and it's normal
-								# (eg: your ISP has Large Scale NAT and the
-								# 6rd BR is reachable without LSN)
-								# Swisscom: say "no" here
-								# Comcast: ?
-								# Others: most likely "no"
+glob_wan_is_private="no"		# If your External WAN IPv4 is private and it's
+								# normal (eg: your ISP has Large Scale NAT and
+								# the 6rd BR is reachable without LSN)
+								# most likely "no" for 99% cases
 
 
 # Routes
@@ -41,4 +39,4 @@ do_nothing="no"					# If you want to test only, set to "yes".
 								# It will print out the commands on stdout.
 								# And some more debug as well.
 								
-glob_dowload_tool="wget"		# "curl" is the other possibility. "wget" is default.
+glob_download_tool="wget"		# "curl" is the other possibility. "wget" is default.
