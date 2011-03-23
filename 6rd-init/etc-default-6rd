@@ -40,3 +40,5 @@ glob_wan_routes=""				# Additional IPv6 routes that can be
 do_nothing="no"					# If you want to test only, set to "yes".
 								# It will print out the commands on stdout.
 								# And some more debug as well.
+								
+glob_dowload_tool="wget"		# "curl" is the other possibility. "wget" is default.

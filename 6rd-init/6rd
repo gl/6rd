@@ -237,17 +237,17 @@ function do_cmd {
 	# $1 : Command to do
 	# Will do a command after checking if it's allowed to do it.
 
-	if [[ ! "$do_nothing" == "yes" ]]; then
-		$1
-	else
+	if [ "$do_nothing" == "yes" ]; then
 		do_debug "Command : $1"
+	else
+		$1
 	fi
 }
 
 function do_debug {
 	# $1 : Displays info on the screen if required in the config
 	
-	if [[ "$do_nothing" == "yes" ]]; then
+	if [ "$do_nothing" == "yes" ]; then
 		echo "6rd : $1"
 	fi
 }
@@ -255,7 +255,7 @@ function do_debug {
 # implements startup of 6rd
 start() {
 
-	if [[ "$do_nothing" == "yes" ]]; then
+	if [ "$do_nothing" == "yes" ]; then
 		do_debug "WARNING : do_nothing=\"yes\" configured - Not configuring your box, and enabling debug."
 	fi
 
@@ -267,10 +267,16 @@ start() {
 	# last, if still no public IP, try to get it via a web service (you're natted)
 
 	# We'll need the WAN IP anyhow, so start with it.
-	ipv4_wan=$(ip -4 addr show dev $glob_wan_iface scope global | cut -s -d/ -f1 | cut -d' ' -f6)
+	ipv4_wan=$( get_ipv4_from_iproute2 $glob_wan_iface )
+	# Check if we got an IP that looks like an IPv4, otherwise return an error
+	if [ $( is_valid_ipv4 $ipv4_wan) != "yes" ]; then
+		echo "6rd : Error : Can't get IPv4 WAN address."
+		exit 1
+	fi
+	
 	do_debug "Info : EthWAN: $ipv4_wan"
 
-	if [ ! "$glob_wan_ip" == "" ];  then
+	if [ $( is_valid_ipv4 $glob_wan_ip) == "yes" ]; then
 		do_debug "Info : WAN IPv4 defined in config : $glob_wan_ip"
 		ipv4=$glob_wan_ip
 	else
@@ -286,20 +292,24 @@ start() {
 			else
 				do_debug "Info : EthWAN IPv4 is not public, and it's not normal."
 				do_debug "Info : WAN IPv4 has to be defined with an external service."			
+				
 				# Need to get my ip automatically.
 				# Right now this page answers only on v4.
-				wget --no-verbose --output-document=$ipfile http://www.whatismyip.fr/raw/
+				if [ "$glob_download_tool" == "curl" ] ; then
+					curl --silent --show-error --interface $ipv4_wan --output $ipfile http://www.whatismyip.fr/raw/
+				else
+					wget --no-verbose --bind-address=$ipv4_wan --output-document=$ipfile http://www.whatismyip.fr/raw/
+				fi
+		
 				ipv4=$(cat $ipfile)
 			fi
 		fi
 	fi
 
-	# TODO : Check if we got an IP, otherwise return an error
-	ipv4_regexp="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
-	if [[ ! $ipv4 =~ $ipv4_regexp ]]; then
-		# give up
-		echo "6rd : Error : Can't get IPv4 public IP address."
-		exit
+	# Check again if we got an IP that looks like an IPv4, otherwise return an error
+	if [ $( is_valid_ipv4 $ipv4) != "yes" ]; then
+		echo "6rd : Error : Can't get IPv4 public address."
+		exit 1
 	fi
 
 	# Maths and String part ... funny stuff !
@@ -314,14 +324,9 @@ start() {
 	# From the Public IPv4 address, we deduct the IPv6 customer prefix.
 	ipv6_6rd_prefix=$(ipv4to6rd $ipv4 $glob_6rd_net)
 	
-	# The customer prefix is either a /24 or /28 : 1st subnet for tunnel, 2nd for LAN
+	# The customer prefix is either a /24 or /28 : 1st subnet for tunnel, 2nd+ for LAN
 	ipv6_wan=$(ipv6subnet $ipv6_6rd_prefix 0x0)
-	ipv6_lan=$(ipv6subnet $ipv6_6rd_prefix 0x1)
-	
 	ipv6=$(hextoip $ipv6_wan 0000000000000001)
-
-	# Now deal with the LAN Subnet for $glob_eth_iface
-	ipv6_lan=$(hextoip $ipv6_lan 0000000000000001)
 
 	# display status
 	do_cmd "echo 6rd - PUBLIC IPv4 address is $ipv4"
@@ -358,6 +363,7 @@ start() {
 		((i++))
 	done
 
+	# Configure the Routes
 	if [ "$glob_wan_default_route" == "yes" ]; then
 		do_cmd "ip -6 route add 2000::/3 via ::$glob_6rd_br dev $glob_6rd_iface"
 	else
