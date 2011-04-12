@@ -1,4 +1,5 @@
 #!/bin/bash
+# vim: set filetype=bash tabstop=4
 
 ### BEGIN INIT INFO
 # Provides:				6rd
@@ -311,7 +312,7 @@ start() {
 
 	# Check again if we got an IP that looks like an IPv4, otherwise return an error
 	if [ $( is_valid_ipv4 $ipv4) != "yes" ]; then
-		echo "6rd : Error : Can't get IPv4 public address."
+		echo "6rd : Error : Can't get IPv4 local tunnel endpoint address."
 		exit 1
 	fi
 
@@ -329,7 +330,7 @@ start() {
 	
 	# The customer prefix is either a /24 or /28 : 1st subnet for tunnel, 2nd+ for LAN
 	ipv6_wan=$(ipv6subnet $ipv6_6rd_prefix 0x0)
-	ipv6=$(hextoip $ipv6_wan 0000000000000001)
+	ipv6=$(hextoip $ipv6_wan 0000000000000001) # Zeros are not needed, it's just for clarity
 
 	# display status
 	do_cmd "echo 6rd - PUBLIC IPv4 address is $ipv4"

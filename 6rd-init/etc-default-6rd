@@ -1,3 +1,4 @@
+# vim: set filetype=bash
 glob_6rd_net="2001:db8::/28"	# 6RD prefix of your ISP. They provide it to you.
 glob_6rd_br="128.66.0.1"		# 6RD Anycast BR of your ISP.
 glob_6rd_iface="6rdtun"			# Name of the interface for the 6rd tunnel
