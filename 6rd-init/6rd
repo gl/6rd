@@ -16,12 +16,8 @@
 # 6rd : Script to start / stop 6rd IPv6
 #
 # Changelog:
-# Version 1.0rc8 (20110323)
-#   - Improvements in IPv4 detection from Bruce Pinsky (bep)
-#   - Allows now several LAN interfaces.
-#	- Allows specific routes for IPv6 WAN
-#	- Improved /32 6rd prefix handling (not tested in the wild)
-#	- Improved the stop behaviour
+# Version 1.0rc9 (20110602)
+#   - External service ipv4 detection uses regexp to find IPv4
 ###############################################################################
 
 # Some things that run always
@@ -305,7 +301,12 @@ start() {
 					wget --no-verbose --bind-address=$ipv4_wan --output-document=$ipfile http://www.whatismyip.fr/raw/
 				fi
 		
-				ipv4=$(cat $ipfile)
+				f_ip=$(cat $ipfile)
+				valid_ipv4_regexp="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" 
+				if [[ $f_ip =~ $valid_ipv4_regexp ]]; then
+					ipv4=${BASH_REMATCH[0]}
+					do_debug "Info : Found WAN IPv4 to be $ipv4."
+				fi
 			fi
 		fi
 	fi
