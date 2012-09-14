@@ -296,9 +296,9 @@ start() {
 				# Need to get my ip automatically.
 				# Right now this page answers only on v4.
 				if [ "$glob_download_tool" = "curl" ] ; then
-					curl --silent --show-error --interface $ipv4_wan --output $ipfile http://www.whatismyip.fr/raw/
+					curl --silent --show-error --interface $ipv4_wan --output $ipfile http://ip1.dynupdate.no-ip.com/
 				else
-					wget --no-verbose --bind-address=$ipv4_wan --output-document=$ipfile http://www.whatismyip.fr/raw/
+					wget --no-verbose --bind-address=$ipv4_wan --output-document=$ipfile http://ip1.dynupdate.no-ip.com/
 				fi
 		
 				f_ip=$(cat $ipfile)
