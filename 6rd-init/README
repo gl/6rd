@@ -8,7 +8,7 @@
 	- Linux >= 2.6.33 (uname -r)
 	- iproute2 >= 2.6.33 (debian package "iproute")
 	- bash >= 3 (bash --version)
-	- cat & cut, but they almost default features on linux.
+	- cat & cut, but they are almost default features on linux.
 	- wget or curl. Unless you have manually static public v4 configured.
 
 2. WHERE IS IT KNOWN TO BE WORKING ?
